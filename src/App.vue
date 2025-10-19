@@ -1,17 +1,22 @@
 <template>
   <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
+    <navMenu></navMenu>
+    <div id="body" class="w1200">
+      <dataPage></dataPage>
+    </div>
+
   </div>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+import navMenu from './components/NavMenu.vue'
+import dataPage from './components/DataPage.vue'
 
 export default {
   name: 'App',
   components: {
-    HelloWorld
+    navMenu,
+    dataPage
   }
 }
 </script>
@@ -23,6 +28,17 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  margin-top: 60px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+#body {
+  padding: 0;
+  padding-top: 80px;
+}
+
+.w1200 {
+  width: 1200px;
+  margin: auto;
 }
 </style>
