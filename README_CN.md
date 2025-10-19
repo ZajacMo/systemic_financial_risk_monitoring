@@ -127,7 +127,7 @@ docker run -d -p 8080:80 --name systematic-risk-container systemic-risk-app
 欢迎贡献！请随时提交Pull Request。
 
 ## 许可证
-本项目采用MIT许可证。
+本项目采用[MIT许可证](./LICENSE)。
 
 ## 联系方式
 如有问题或建议，请联系项目维护者。

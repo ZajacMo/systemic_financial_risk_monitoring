@@ -126,7 +126,7 @@ The project uses local JSON files for demonstration purposes, including:
 Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](./LICENSE).
 
 ## Contact
 For questions or suggestions, please contact the project maintainers.
