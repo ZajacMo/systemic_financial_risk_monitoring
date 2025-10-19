@@ -1,5 +1,5 @@
 {
-  "name": "pro2",
+  "name": "systemetic-risk",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,10 +9,13 @@
   },
   "dependencies": {
     "core-js": "^3.8.3",
+    "d3": "^7.9.0",
     "echarts": "^5.6.0",
     "element-react": "^1.4.34",
     "element-ui": "^2.15.14",
-    "vue": "^2.6.14"
+    "vue": "^2.6.14",
+    "vue-router": "^3.6.5",
+    "vuex": "^3.6.2"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",
@@ -21,7 +24,7 @@
     "@vue/cli-plugin-eslint": "~5.0.0",
     "@vue/cli-service": "~5.0.0",
     "eslint": "^7.32.0",
-    "eslint-plugin-vue": "^8.0.3",
+    "eslint-plugin-vue": "^9.32.0",
     "vue-template-compiler": "^2.6.14"
   },
   "eslintConfig": {
