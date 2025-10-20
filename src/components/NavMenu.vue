@@ -13,7 +13,7 @@
                     {{ item.market }}
                 </el-menu-item>
             </el-submenu>
-            <!-- <el-menu-item index="3" disabled>消息中心</el-menu-item> -->
+            <el-menu-item index="/agent">风险Agent</el-menu-item>
             <el-menu-item index="/about" disabled>关于我们</el-menu-item>
             <el-menu-item index="/outter" disabled>接口管理</el-menu-item>
         </el-menu>

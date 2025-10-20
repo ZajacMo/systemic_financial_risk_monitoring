@@ -1,91 +1,101 @@
 <template>
-    <div class="body-container">
+  <div class="home-with-sidebar">
+    <div class="home-main">
+      <div class="body-container">
         <div class="display-row">
-            <div class="display-col" style="width: 65%;">
-                <i class="el-icon-data-line icon">&ensp;|&ensp;风险图像</i>
-                <riskLine mode="system" class="card"></riskLine>
-            </div>
-            <div class="display-col" style="width: 32%;">
-                <div style="position:absolute; top:15%; width: 95%; text-align: center; font-size: 15px;"><strong>今日</strong>高风险区制概率密度</div>
-                <i class="el-icon-pie-chart icon">&ensp;|&ensp;风险区制</i>
-                <riskValue :riskPossibility="0.3633" class="card"></riskValue>
-            </div >
+          <div class="display-col" style="width: 65%;">
+            <i class="el-icon-data-line icon">&ensp;|&ensp;风险图像</i>
+            <riskLine mode="system" class="card"></riskLine>
+          </div>
+          <div class="display-col" style="width: 32%;">
+            <div style="position:absolute; top:15%; width: 95%; text-align: center; font-size: 15px;"><strong>今日</strong>高风险区制概率密度</div>
+            <i class="el-icon-pie-chart icon">&ensp;|&ensp;风险区制</i>
+            <riskValue :riskPossibility="0.3633" class="card"></riskValue>
+          </div>
         </div>
         <div class="display-row">
-            <div class="display-col" style="width: 32%;">
-                <i class="el-icon-data-analysis icon">&ensp;|&ensp;风险溢出</i>
-                <riskMap class="card" style="height: 400px;max-width: 100%;padding: 0px;"></riskMap>
-                <!-- <el-table stripe style="width: 100%"
-                    class="card"
-                    fit
-                    :data="riskSpillover"
-                    :cell-style="{ textAlign: 'center' }"
-                    :header-cell-style="{ textAlign: 'center' }">
-                    <el-table-column v-for='item in getCols([
-                        { prop: "市场分类", label: "溢出源\\方向", width: "15%" },
-                        ])'
-                        :key="item.prop"
-                        :prop="item.prop" 
-                        :label="item.label"
-                        :min-width="item.width">
-                    </el-table-column>
-                </el-table> -->
+          <div class="display-col" style="width: 32%;">
+            <i class="el-icon-data-analysis icon">&ensp;|&ensp;风险溢出</i>
+            <riskMap class="card" style="height: 400px;max-width: 100%;padding: 0px;"></riskMap>
+            <!-- <el-table stripe style="width: 100%"
+                class="card"
+                fit
+                :data="riskSpillover"
+                :cell-style="{ textAlign: 'center' }"
+                :header-cell-style="{ TextAlign: 'center' }">
+                <el-table-column v-for='item in getCols([
+                    { prop: "市场分类", label: "溢出源\\方向", width: "15%" },
+                    ])'
+                    :key="item.prop"
+                    :prop="item.prop" 
+                    :label="item.label"
+                    :min-width="item.width">
+                </el-table-column>
+            </el-table> -->
+          </div>
+          <div class="display-col" style="width: 65%;">
+            <i class="el-icon-connection icon">&ensp;|&ensp;相关系数</i>
+            <div class="card">
+              <el-table stripe style="width: 100%"
+                fit
+                height="360"
+                size="medium"
+                :data="correlationCoefficients"
+                :cell-style="{ textAlign: 'center' }"
+                :header-cell-style="{ textAlign: 'center' }">
+                <el-table-column v-for='item in getCols([
+                    { prop: "市场分类", label: "市场分类", width: "16%" },
+                    ])'
+                    :key="item.prop"
+                    :prop="item.prop" 
+                    :label="item.label"
+                    :min-width="item.width">
+                </el-table-column>
+              </el-table>
             </div>
-            <div class="display-col" style="width: 65%;">
-                <i class="el-icon-connection icon">&ensp;|&ensp;相关系数</i>
-                <div class="card">
-                    <el-table stripe style="width: 100%"
-                    fit
-                    height="360"
-                    size="medium"
-                    :data="correlationCoefficients"
-                    :cell-style="{ textAlign: 'center' }"
-                    :header-cell-style="{ textAlign: 'center' }">
-                    <el-table-column v-for='item in getCols([
-                        { prop: "市场分类", label: "市场分类", width: "16%" },
-                        ])'
-                        :key="item.prop"
-                        :prop="item.prop" 
-                        :label="item.label"
-                        :min-width="item.width">
-                        </el-table-column>
-                    </el-table>
-                </div>
-                
-            </div>
+          </div>
         </div>
         <div class="display-row">
-            <div class="display-col" style="width: 100%;">
-                <i class="el-icon-date icon">&ensp;|&ensp;市场压力</i>
-                <el-table stripe style="width: 100%" 
-                    class="card"
-                    :data="marketIndicators.slice(-6,-1).reverse()"
-                    fit 
-                    :cell-style="{ textAlign: 'center' }"
-                    :header-cell-style="{ textAlign: 'center' }">
-                    <el-table-column v-for='item in getCols([
-                            { prop: "时间", label: "日期", width: "15%" },
-                            { prop: "综合指数", label: "金融系统", width: "15%" },
-                        ])' 
-                        :key="item.prop"
-                        :prop="item.prop" 
-                        :label="item.label"
-                        :min-width="item.width" >
-                    </el-table-column>
-                </el-table>
-            </div>
+          <div class="display-col" style="width: 100%;">
+            <i class="el-icon-date icon">&ensp;|&ensp;市场压力</i>
+            <el-table stripe style="width: 100%" 
+              class="card"
+              :data="marketIndicators.slice(-6,-1).reverse()"
+              fit 
+              :cell-style="{ textAlign: 'center' }"
+              :header-cell-style="{ textAlign: 'center' }">
+              <el-table-column v-for='item in getCols([
+                { prop: "时间", label: "日期", width: "15%" },
+                { prop: "综合指数", label: "金融系统", width: "15%" },
+              ])' 
+                :key="item.prop"
+                :prop="item.prop" 
+                :label="item.label"
+                :min-width="item.width" >
+              </el-table-column>
+            </el-table>
+          </div>
         </div>
         <el-row :gutter="20">
-            <el-col :span="12"><div class="grid-content bg-purple"></div></el-col>
-            <el-col :span="12"></el-col>
+          <el-col :span="12"><div class="grid-content bg-purple"></div></el-col>
+          <el-col :span="12"></el-col>
         </el-row>
+      </div>
     </div>
+    <div class="home-aside">
+      <el-button type="primary" icon="el-icon-chat-line-round" @click="aiOpen = true">打开 AI 侧栏</el-button>
+    </div>
+    <el-drawer :visible.sync="aiOpen" direction="rtl" size="380px" :with-header="false" custom-class="ai-drawer">
+      <AgentPage />
+    </el-drawer>
+  </div>
 </template>
 
 <script>
 import riskLine from "@/components/RiskLine.vue";
 import riskValue from "@/components/RiskValue.vue";
 import riskMap from "@/components/RiskMap.vue";
+import AgentPage from "@/views/AgentPage.vue";
 import marketIndicators from "@/db/marketIndicators.json";
 import correlationCoefficients from "@/db/correlationCoefficient.json";
 import riskSpillover from "@/db/riskSpillover.json";
@@ -96,6 +106,7 @@ export default {
 		riskLine,
 		riskValue,
 		riskMap,
+		AgentPage,
 	},props:{
 
 
@@ -111,6 +122,7 @@ export default {
 			marketIndicators,
 			correlationCoefficients,
 			riskSpillover,
+			aiOpen: true,
 		};
 	},computed:{
 		...mapState(["tableData"]),
@@ -156,5 +168,21 @@ div.body-container{
         padding: 20px;
     }
 }
+
+/* 右侧 AI 侧栏布局 */
+.home-with-sidebar{
+  display: flex;
+  gap: 16px;
+  max-width: 90%;
+  margin: 0 auto;
+}
+.home-main{ flex: 1; }
+.home-aside{
+  width: 360px;
+  position: sticky;
+  top: 80px;
+  align-self: flex-start;
+}
+.ai-drawer .el-drawer__body { padding: 0; background-color: #f5f7fa; }
 
 </style>
