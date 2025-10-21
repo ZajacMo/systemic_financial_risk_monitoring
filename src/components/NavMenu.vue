@@ -32,6 +32,7 @@ export default {
 
 <style>
 #menu{
-    margin: 0 auto;
-    max-width: 90%;
-}</style>
+    margin: 0;
+    width: 100%;
+}
+</style>

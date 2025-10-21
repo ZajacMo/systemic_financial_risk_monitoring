@@ -5,7 +5,7 @@ const {
   getIndicatorSeriesInRange,
   getMarketIndicatorSeriesInRange,
   getTodayMatrices,
-} = require('./dataAccess');
+} = require("./dataAccess");
 
 function sendOk(res, payload) {
   res.json({ ok: true, ...payload });
@@ -18,29 +18,38 @@ function sendError(res, error, status = 400) {
 function parseIndicatorsParam(q) {
   if (!q) return MARKET_KEYS;
   if (Array.isArray(q)) return q;
-  if (typeof q === 'string') return q.split(',').map((s) => s.trim()).filter(Boolean);
+  if (typeof q === "string")
+    return q
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   return MARKET_KEYS;
 }
 
 function registerAPIs(app) {
   // Enable JSON body parsing for POST requests
-  const express = require('express');
+  const express = require("express");
   app.use(express.json());
 
   // Health
-  app.get('/api/tools/health', (req, res) => {
-    res.json({ ok: true, status: 'up' });
+  app.get("/api/tools/health", (req, res) => {
+    res.json({ ok: true, status: "up" });
   });
 
   // 1) Systemic risk index range (indicatorData.json)
-  app.get('/api/tools/risk-index', (req, res) => {
+  app.get("/api/tools/risk-index", (req, res) => {
     const { start, end, date, keys } = req.query;
     const useKeys = keys ? parseIndicatorsParam(keys) : INDICATOR_KEYS;
-    const result = getIndicatorSeriesInRange({ start, end, date, keys: useKeys });
+    const result = getIndicatorSeriesInRange({
+      start,
+      end,
+      date,
+      keys: useKeys,
+    });
     if (!result.ok) return sendError(res, result.error);
     return sendOk(res, {
-      source: 'indicatorData.json',
-      universe: '系统性金融风险压力指数',
+      source: "indicatorData.json",
+      universe: "系统性金融风险压力指数",
       requested: result.requested,
       coverage: result.coverage,
       series: result.series,
@@ -48,14 +57,19 @@ function registerAPIs(app) {
   });
 
   // 2) Market-specific indicators range (marketIndicators.json)
-  app.get('/api/tools/market-indicators', (req, res) => {
+  app.get("/api/tools/market-indicators", (req, res) => {
     const { start, end, date, indicators } = req.query;
     const inds = parseIndicatorsParam(indicators);
-    const result = getMarketIndicatorSeriesInRange({ start, end, date, indicators: inds });
+    const result = getMarketIndicatorSeriesInRange({
+      start,
+      end,
+      date,
+      indicators: inds,
+    });
     if (!result.ok) return sendError(res, result.error);
     return sendOk(res, {
-      source: 'marketIndicators.json',
-      universe: '分市场系统性风险压力指数',
+      source: "marketIndicators.json",
+      universe: "分市场系统性风险压力指数",
       requested: result.requested,
       coverage: result.coverage,
       series: result.series,
@@ -63,12 +77,12 @@ function registerAPIs(app) {
   });
 
   // 3) Today matrices: correlation and spillover
-  app.get('/api/tools/matrices', (req, res) => {
+  app.get("/api/tools/matrices", (req, res) => {
     const { date } = req.query;
     const result = getTodayMatrices({ date });
     return sendOk(res, {
-      source: ['correlationCoefficient.json', 'riskSpillover.json'],
-      universe: '风险相关与溢出矩阵（当日）',
+      source: ["correlationCoefficient.json", "riskSpillover.json"],
+      universe: "风险相关与溢出矩阵（当日）",
       requested: result.requested,
       coverage: result.coverage,
       correlationCoefficient: result.correlationCoefficient,
@@ -76,66 +90,159 @@ function registerAPIs(app) {
     });
   });
 
-
   // 4) LLM chat proxy to Ark
-  const https = require('https');
-  function arkChatCompletion({ messages, model = 'doubao-1-5-pro-32k-250115' }) {
+  const https = require("https");
+  function arkChatCompletion({
+    messages,
+    model = "doubao-1-5-pro-32k-250115",
+  }) {
     return new Promise((resolve, reject) => {
       const apiKey = process.env.ARK_API_KEY;
       if (!apiKey) {
-        return reject({ message: '缺少 ARK_API_KEY 环境变量', details: { env: 'ARK_API_KEY' }, code: 'MISSING_API_KEY' });
+        return reject({
+          message: "缺少 ARK_API_KEY 环境变量",
+          details: { env: "ARK_API_KEY" },
+          code: "MISSING_API_KEY",
+        });
       }
       const data = JSON.stringify({ messages, model });
       const req = https.request(
         {
-          hostname: 'ark.cn-beijing.volces.com',
-          path: '/api/v3/chat/completions',
-          method: 'POST',
+          hostname: "ark.cn-beijing.volces.com",
+          path: "/api/v3/chat/completions",
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Length': Buffer.byteLength(data),
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Length": Buffer.byteLength(data),
           },
         },
         (r) => {
-          let body = '';
-          r.setEncoding('utf8');
-          r.on('data', (chunk) => { body += chunk; });
-          r.on('end', () => {
+          let body = "";
+          r.setEncoding("utf8");
+          r.on("data", (chunk) => {
+            body += chunk;
+          });
+          r.on("end", () => {
             try {
               const json = JSON.parse(body);
               if (r.statusCode >= 200 && r.statusCode < 300) {
                 resolve(json);
               } else {
-                const message = (json && json.error && (json.error.message || json.error.code)) || 'Ark API 错误';
+                const message =
+                  (json &&
+                    json.error &&
+                    (json.error.message || json.error.code)) ||
+                  "Ark API 错误";
                 reject({ message, details: json, status: r.statusCode });
               }
             } catch (e) {
-              reject({ message: 'Ark API 响应解析失败', details: { body }, cause: e });
+              reject({
+                message: "Ark API 响应解析失败",
+                details: { body },
+                cause: e,
+              });
             }
           });
         }
       );
-      req.on('error', (err) => {
-        reject({ message: 'Ark API 请求失败', details: err });
+      req.on("error", (err) => {
+        reject({ message: "Ark API 请求失败", details: err });
       });
       req.write(data);
       req.end();
     });
   }
 
-  app.post('/api/llm/chat', async (req, res) => {
+  app.post("/api/llm/chat", async (req, res) => {
     const { messages, model } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
-      return sendError(res, { message: '请求参数错误：messages 必须为非空数组' }, 400);
+      return sendError(
+        res,
+        { message: "请求参数错误：messages 必须为非空数组" },
+        400
+      );
     }
     try {
       const ark = await arkChatCompletion({ messages, model });
-      const content = ark && ark.choices && ark.choices[0] && ark.choices[0].message ? ark.choices[0].message.content : '';
+      const content =
+        ark && ark.choices && ark.choices[0] && ark.choices[0].message
+          ? ark.choices[0].message.content
+          : "";
       return sendOk(res, { text: content, raw: ark });
     } catch (err) {
-      return sendError(res, { message: err.message || 'LLM 请求失败', details: err.details || err }, err.status || 502);
+      return sendError(
+        res,
+        { message: err.message || "LLM 请求失败", details: err.details || err },
+        err.status || 502
+      );
     }
+  });
+
+  // 5) LLM chat streaming proxy to Ark (NDJSON streaming)
+  app.post("/api/llm/stream-chat", (req, res) => {
+    const { messages, model = "doubao-1-5-pro-32k-250115" } = req.body || {};
+    if (!Array.isArray(messages) || messages.length === 0) {
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.write(
+        JSON.stringify({ error: "请求参数错误：messages 必须为非空数组" }) +
+          "\n"
+      );
+      return res.end();
+    }
+    const apiKey = process.env.ARK_API_KEY;
+    if (!apiKey) {
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.write(
+        JSON.stringify({
+          error: "缺少 ARK_API_KEY 环境变量",
+          code: "MISSING_API_KEY",
+        }) + "\n"
+      );
+      return res.end();
+    }
+
+    const data = JSON.stringify({ messages, model, stream: true });
+    const reqArk = https.request(
+      {
+        hostname: "ark.cn-beijing.volces.com",
+        path: "/api/v3/chat/completions",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Length": Buffer.byteLength(data),
+        },
+      },
+      (r) => {
+        // NDJSON 流式响应头，尽量避免缓冲
+        res.setHeader("Content-Type", "application/x-ndjson");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.setHeader("X-Accel-Buffering", "no");
+        res.setHeader("Content-Encoding", "identity");
+        if (typeof res.flushHeaders === "function") res.flushHeaders();
+
+        r.setEncoding("utf8");
+        r.on("data", (chunk) => {
+          // 直接转发 Ark 的 NDJSON chunk
+          res.write(chunk);
+        });
+        r.on("end", () => {
+          res.write("[DONE]\n");
+          res.end();
+        });
+      }
+    );
+    reqArk.on("error", (err) => {
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.write(
+        JSON.stringify({ error: "Ark API 请求失败", details: err }) + "\n"
+      );
+      res.end();
+    });
+    reqArk.write(data);
+    reqArk.end();
   });
 }
 

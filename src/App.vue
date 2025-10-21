@@ -3,10 +3,10 @@
     <div id="header">
       <navMenu></navMenu>
     </div>
-    <div id="body">
+    <div id="body" :class="{ full: isAgentRoute }">
       <router-view :key="this.$route.path"></router-view>
     </div>
-    <div id="footer">
+    <div id="footer" v-if="!isAgentRoute">
       <footerComponent></footerComponent>
     </div>
   </div>
@@ -23,6 +23,11 @@ export default {
     navMenu,
     footerComponent,
   },
+  computed: {
+    isAgentRoute() {
+      return this.$route && this.$route.path === "/agent";
+    }
+  }
 };
 </script>
 
@@ -44,11 +49,33 @@ export default {
   /* margin: 0 auto; */
   /* padding: auto; */
   background-color: #545c64;
+  /* 新增：与菜单高度对齐，避免顶部右侧出现残影 */
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+}
+/* 移除 ElementUI 横向菜单的底边与伪元素，避免右上角突出 */
+#header .el-menu.el-menu--horizontal {
+  border-bottom: none !important;
+  height: 56px;
+  line-height: 56px;
+}
+#header .el-menu.el-menu--horizontal::before,
+#header .el-menu.el-menu--horizontal::after {
+  display: none !important;
+}
+#header .el-menu-item,
+#header .el-submenu {
+  border-bottom: none !important;
 }
 
 #body {
   background-color: #ebeff0;
   padding-bottom: 20px;
+}
+#body.full {
+  min-height: calc(100vh - 56px);
+  padding-bottom: 0;
 }
 
 #footer {
