@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */
 // Converted to JavaScript for runtime usage without TypeScript
 // Do not expose internal reasoning; only return RiskAnswer-compatible object
 

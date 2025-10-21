@@ -13,15 +13,16 @@
 </template>
 
 <script>
+/* eslint-disable indent */
 import navMenu from "@/components/NavMenu.vue";
 import footerComponent from "@/components/Footer.vue";
 
 export default {
-	name: "App",
-	components: {
-		navMenu,
-		footerComponent
-	},
+  name: "App",
+  components: {
+    navMenu,
+    footerComponent,
+  },
 };
 </script>
 
@@ -34,16 +35,15 @@ export default {
   padding: 0;
 }
 
-#header{
+#header {
   position: sticky;
   z-index: 1000;
   top: 0;
-  width:  100%;
+  width: 100%;
   overflow: hidden;
   /* margin: 0 auto; */
   /* padding: auto; */
   background-color: #545c64;
-
 }
 
 #body {
@@ -53,17 +53,16 @@ export default {
 
 #footer {
   bottom: 0;
-  width:  100%;
+  width: 100%;
   background-color: white;
 }
 
-.bodyContainer{
+.bodyContainer {
   max-width: 1200px;
   margin: 0 auto;
   background-color: #ebeff0;
 }
-.bg-white{
+.bg-white {
   background-color: white;
 }
-
 </style>

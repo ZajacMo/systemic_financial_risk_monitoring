@@ -18,10 +18,8 @@ module.exports = {
 		"vue"
 	],
 	"rules": {
-		"indent": [
-			"error",
-			"tab"
-		],
+		"indent": "off",
+		"no-empty": "warn",
 		"linebreak-style": [
 			"error",
 			"unix"
