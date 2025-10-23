@@ -12,7 +12,9 @@
             :aria-label="m.copied ? '已复制' : '复制结果'"
             :title="m.copied ? '已复制' : '复制结果'"
           >
-            <i :class="m.copied ? 'el-icon-check' : 'el-icon-document-copy'"></i>
+            <i
+              :class="m.copied ? 'el-icon-check' : 'el-icon-document-copy'"
+            ></i>
           </button>
         </div>
       </div>
@@ -66,7 +68,7 @@
 
 <script>
 /* eslint-disable indent */
-import { analyzeWithFunctionCalling } from "@/ai/agentRunner";
+import { analyzeWithFunctionCalling, askLLM } from "@/ai/agentRunner";
 import { marked } from "marked";
 
 // 配置 marked 选项
@@ -76,6 +78,9 @@ marked.setOptions({
 });
 
 const DATE_RE = /\b\d{4}-\d{2}-\d{2}\b/;
+const CN_DATE_RE = /\d{4}年\d{1,2}月\d{1,2}(?:日|号)?/;
+const SLASH_DATE_RE = /\b\d{4}\/\d{1,2}\/\d{1,2}\b/;
+const DOT_DATE_RE = /\b\d{4}\.\d{1,2}\.\d{1,2}\b/;
 export default {
   name: "AgentPage",
   data() {
@@ -98,7 +103,66 @@ export default {
   methods: {
     renderMarkdown(text) {
       if (!text) return "";
-      return marked(text);
+      const normalized = this.normalizeLatexDelimiters(text);
+      // 逐条渲染时关闭 breaks，避免将 $$ 数学块拆成多个 <br> 节点
+      return marked.parse(normalized, { breaks: false, gfm: true });
+    },
+    normalizeLatexDelimiters(text) {
+      if (!text) return "";
+      const fenceRegex = /```[\s\S]*?```/g;
+      const inlineCodeRegex = /`[^`]*`/g;
+      const segments = [];
+      let lastIndex = 0;
+      let m;
+      while ((m = fenceRegex.exec(text)) !== null) {
+        if (m.index > lastIndex) {
+          segments.push({
+            kind: "text",
+            value: text.slice(lastIndex, m.index),
+          });
+        }
+        segments.push({ kind: "fence", value: m[0] });
+        lastIndex = m.index + m[0].length;
+      }
+      if (lastIndex < text.length) {
+        segments.push({ kind: "text", value: text.slice(lastIndex) });
+      }
+      const transformDelims = (s) => {
+        const parts = [];
+        let last = 0;
+        let im;
+        while ((im = inlineCodeRegex.exec(s)) !== null) {
+          if (im.index > last) {
+            parts.push({ kind: "text", value: s.slice(last, im.index) });
+          }
+          parts.push({ kind: "inline", value: im[0] });
+          last = im.index + im[0].length;
+        }
+        if (last < s.length) parts.push({ kind: "text", value: s.slice(last) });
+        return parts
+          .map((p) => {
+            if (p.kind !== "text") return p.value;
+            return p.value
+              .replace(/\\\[/g, "$$")
+              .replace(/\\\]/g, "$$")
+              .replace(/\\\(/g, "$")
+              .replace(/\\\)/g, "$")
+              // 将 KaTeX 不支持的 align/align* 环境转换为 aligned
+              .replace(/\\begin\{align\*\}/g, "\\begin{aligned}")
+              .replace(/\\end\{align\*\}/g, "\\end{aligned}")
+              .replace(/\\begin\{align\}/g, "\\begin{aligned}")
+              .replace(/\\end\{align\}/g, "\\end{aligned}")
+              // 让块级 $$ 与内容在同一段内，避免被 <p> 分裂
+              .replace(/(^|\n)\$\$\s*\n/g, "$$")
+              .replace(/\n\s*\$\$(\n|$)/g, "$$");
+          })
+          .join("");
+      };
+      return segments
+        .map((seg) =>
+          seg.kind === "text" ? transformDelims(seg.value) : seg.value
+        )
+        .join("");
     },
     // 复制相关方法
     isResultMessage(m) {
@@ -138,7 +202,10 @@ export default {
           success = true;
         }
       } catch (e) {
-        try { doCopyFallback(); success = true; } catch (e2) {}
+        try {
+          doCopyFallback();
+          success = true;
+        } catch (e2) {}
       }
       // 状态反馈：仅在复制成功时显示绿色对勾（2-3 秒）
       if (success) {
@@ -155,6 +222,54 @@ export default {
           }
         } catch (e) {}
       }
+    },
+    async llmDetectDateRange(text) {
+      // 使用后端 LLM 快速提取绝对日期或日期区间，仅返回 JSON
+      const system = [
+        "从中文或英文文本中提取绝对日期或日期区间，",
+        "仅返回一个 JSON：{ date: 'YYYY-MM-DD' } 或 { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD' }。",
+        "支持格式：YYYY-MM-DD、YYYY/M/D、YYYY.MM.DD、YYYY年M月D(日|号)，连接词：到、至、~、-。",
+        "如无法确定绝对日期，返回 {}。不要输出任何非 JSON 文本。",
+      ].join("\n");
+      const messages = [
+        { role: "system", content: system },
+        { role: "user", content: text || "" },
+        { role: "assistant", content: "{" },
+      ];
+      try {
+        const llm = await askLLM(messages);
+        let s = llm && llm.text ? String(llm.text).trim() : "";
+        // 去除可能的代码块包裹
+        s = s
+          .replace(/^```(?:json)?\s*/i, "")
+          .replace(/```$/i, "")
+          .trim();
+        // 截取首个 JSON 开始
+        const first = Math.min(
+          ...[s.indexOf("{"), s.indexOf("[")].filter((x) => x >= 0)
+        );
+        if (first > 0) s = s.slice(first);
+        let obj = null;
+        try {
+          obj = JSON.parse(s);
+        } catch (_) {
+          // 尝试去除尾部逗号
+          s = s.replace(/,\s*([}\]])/g, "$1");
+          try {
+            obj = JSON.parse(s);
+          } catch (e) {
+            obj = null;
+          }
+        }
+        const isDate = (d) =>
+          typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d);
+        if (obj && isDate(obj.date)) return { date: obj.date };
+        if (obj && isDate(obj.start) && isDate(obj.end))
+          return { start: obj.start, end: obj.end };
+      } catch (e) {
+        /* ignore */
+      }
+      return undefined;
     },
     detectIntent(text) {
       return /溢出|相关|矩阵|相关系数/.test(text)
@@ -174,24 +289,28 @@ export default {
     async send() {
       this.error = "";
       const userText = this.query || "";
-      const userRange =
+      let userRange =
         this.dateRange && this.dateRange.length === 2
           ? { start: this.dateRange[0], end: this.dateRange[1] }
           : undefined;
       const intent = this.detectIntent(userText);
       const hasDateInText =
-        DATE_RE.test(userText) || /今日|今天|当日/.test(userText);
+        DATE_RE.test(userText) ||
+        CN_DATE_RE.test(userText) ||
+        SLASH_DATE_RE.test(userText) ||
+        DOT_DATE_RE.test(userText) ||
+        /今日|今天|当日/.test(userText);
 
       // 先推送用户消息
       this.messages.push({ role: "user", text: userText });
       this.query = "";
-      this.$nextTick(this.scrollToBottom);
+      this.$nextTick(this.afterRender);
 
       this.loading = true;
       // 始终显示“正在思考中”
       const thinkingMsg = { role: "assistant", text: "正在思考中" };
       this.messages.push(thinkingMsg);
-      this.$nextTick(this.scrollToBottom);
+      this.$nextTick(this.afterRender);
 
       let resultMsg = null; // 首个内容到达后再创建“===RESULT===”
 
@@ -207,7 +326,7 @@ export default {
           }
           resultMsg = { role: "assistant", text: "===RESULT===\n" };
           this.messages.push(resultMsg);
-          this.$nextTick(this.scrollToBottom);
+          this.$nextTick(this.afterRender);
         }
       };
       const tokenize = (str) => {
@@ -225,7 +344,7 @@ export default {
         ensureResultBanner();
         const next = typedQueue.shift();
         resultMsg.text += next;
-        this.$nextTick(this.scrollToBottom);
+        this.$nextTick(this.afterRender);
         setTimeout(pump, typingDelay);
       };
       const enqueueTyped = (text) => {
@@ -239,8 +358,17 @@ export default {
       };
 
       try {
-        const skipDeterministic =
+        let skipDeterministic =
           intent !== "matrices" && !userRange && !hasDateInText;
+        if (skipDeterministic) {
+          // 前置一步：通过 LLM 尝试提取绝对日期区间
+          const maybe = await this.llmDetectDateRange(userText);
+          if (maybe && (maybe.date || (maybe.start && maybe.end))) {
+            userRange = maybe;
+            skipDeterministic = false;
+          }
+        }
+
         if (skipDeterministic) {
           // 调用 Ark 流式接口，首个 token 到达后再输出“===RESULT===”
           const resp = await fetch("/api/llm/stream-chat", {
@@ -248,7 +376,11 @@ export default {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               messages: [
-                { role: "system", content: "You are a helpful assistant." },
+                {
+                  role: "system",
+                  content:
+                    "你是一个有帮助的助手。所有输出使用 Markdown；如需书写数学表达，使用 LaTeX 定界符（行内 `$...$`，行间 `$$...$$`，或 `\\(...\\)` / `\\[...\\]`）；不要把公式放入代码块；不要返回图片或嵌入的 HTML 片段。",
+                },
                 { role: "user", content: userText },
               ],
               stream: true,
@@ -312,10 +444,6 @@ export default {
           }
           clearTimeout(bannerTimer);
 
-          if (!userRange && !hasDateInText) {
-            this.error =
-              "建议在问题中包含日期（YYYY-MM-DD）或点击左下角日历选择范围。若要查询矩阵，可直接输入“相关矩阵”。";
-          }
           return;
         }
 
@@ -337,7 +465,7 @@ export default {
           role: "assistant",
           text: `LLM 错误：${this.error}`,
         });
-        this.$nextTick(this.scrollToBottom);
+        this.$nextTick(this.afterRender);
       } finally {
         this.loading = false;
       }
@@ -348,7 +476,31 @@ export default {
         el.scrollTop = el.scrollHeight;
       }
     },
-  },
+    afterRender() {
+      this.scrollToBottom();
+      try {
+        const el = this.$refs.chatWindow;
+        if (el) {
+          const composer = this.$el.querySelector(".composer");
+          if (composer) {
+            const pb = composer.offsetHeight + 16; // 底部留白，避免遮挡
+            el.style.paddingBottom = pb + "px";
+          }
+        }
+        if (el && window.renderMathInElement) {
+          window.renderMathInElement(el, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false },
+              { left: "\\(", right: "\\)", display: false },
+              { left: "\\[", right: "\\]", display: true },
+            ],
+            throwOnError: false,
+          });
+        }
+      } catch (e) {}
+    },
+  }
 };
 </script>
 
@@ -356,10 +508,11 @@ export default {
 .chat-container {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 56px); /* 扣除顶部导航高度，保持全屏 */
+  position: relative;
+  height: 100%; /* 在卡片内占满可用高度 */
 }
 .chat-container.center-mode {
-  justify-content: center; /* 垂直居中：无输入时 */
+  justify-content: flex-start; /* 保持顶部对齐，输入框固定到底部 */
 }
 .chat-header {
   padding: 12px 16px;
@@ -368,11 +521,14 @@ export default {
 .chat-window {
   flex: 1;
   overflow-y: auto;
-  padding: 0 0 8px 0; /* 统一使用卡片的内边距，仅保留底部轻微间距 */
+  padding: 0 0 200px 0; /* 为底部固定输入框预留空间，避免遮挡 */
   background: transparent; /* 让父级卡片背景生效 */
+  position: relative; /* 启用 z-index 层级控制 */
+  z-index: 1; /* 聊天内容层级低于输入框 */
 }
+/* 仍允许在 center-mode 下展示窗口（空态时也可滚动） */
 .chat-container.center-mode .chat-window {
-  display: none;
+  display: block;
 }
 .message {
   display: flex;
@@ -403,31 +559,31 @@ export default {
   border: 1px solid #303133; /* 结果气泡加深边框，贴近示意图 */
 }
 .copy-btn {
-    position: absolute;
-    right: -6px;
-    bottom: -6px;
-    width: 28px;
-    height: 28px;
-    border: 1px solid #dcdfe6;
-    background: #fff;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #606266;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-  .copy-btn:hover {
-    color: #409eff;
-    border-color: #c0d3f9;
-  }
-  .copy-btn.copied {
-    color: #2ecc71;
-    border-color: #2ecc71;
-    background: #eafff3;
-  }
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #dcdfe6;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #606266;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.copy-btn:hover {
+  color: #409eff;
+  border-color: #c0d3f9;
+}
+.copy-btn.copied {
+  color: #2ecc71;
+  border-color: #2ecc71;
+  background: #eafff3;
+}
 .content {
   font-size: 14px;
   line-height: 1.3; /* 单行更紧凑 */
@@ -543,18 +699,23 @@ export default {
   font-style: italic;
 }
 .composer {
-  position: sticky;
+  position: absolute;
+  left: 0;
+  right: 0;
   bottom: 0;
   background: transparent; /* 与卡片背景一致 */
   border-top: none;
   padding: 0;
+  z-index: 10; /* 置于聊天窗口之上 */
 }
+/* 取消居中，始终固定在卡片底部 */
 .chat-container.center-mode .composer {
-  position: relative;
-  bottom: auto;
-  align-self: center; /* 水平居中 */
-  width: 90%;
-  max-width: 640px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: none;
 }
 .error {
   color: #c00;
@@ -567,6 +728,7 @@ export default {
   border-radius: 8px; /* 略带圆角 */
   background: #fff;
   padding: 12px 12px 68px 12px; /* 底部为图标和按钮预留空间 */
+  z-index: 11; /* 保证内部控件在浮层上方显示 */
 }
 .input-box textarea {
   width: 100%;
